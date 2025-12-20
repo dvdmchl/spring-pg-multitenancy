@@ -19,7 +19,7 @@ import java.util.Map;
 public class MultiSchemaConnectionProvider implements MultiTenantConnectionProvider<TenantIdentifier>, HibernatePropertiesCustomizer {
 
     private final transient DataSource dataSource;
-    private final MultitenancyProperties properties;
+    private final transient MultitenancyProperties properties;
 
     @Override
     public Connection getAnyConnection() throws SQLException {
