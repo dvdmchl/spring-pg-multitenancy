@@ -66,6 +66,29 @@ The library is not on Maven Central yet; FRP (`C:\dev\Projects\office\frp\Family
 `0.1.0-SNAPSHOT` from the local `.m2`. After changing the library, run `mvn install` and then build/test FRP
 (`mvn test -pl code/backend`) to make sure the consumer still works.
 
+## Engineering practices
+
+These apply to all code and tests and complement the conventions below.
+
+- **Test-first (TDD).** For new behaviour write a failing test first, then the minimal code that makes it pass, then
+  refactor with the tests green. A bug fix starts with a test that reproduces the bug; keep it as a regression test.
+- **Test quality.** One behaviour per test, descriptive names (`shouldXWhenY`), Arrange-Act-Assert structure.
+  Tests are deterministic: no `Thread.sleep` or fixed timeouts, no dependence on test order, current time or locale.
+  Mock only boundaries you do not own; behaviour touching PostgreSQL is tested against the real database.
+- **DRY, but not prematurely.** Do not copy logic, constants, SQL or test setup; extract a shared method, helper or
+  fixture instead. Introduce an abstraction when a third copy would appear, not speculatively.
+- **KISS / YAGNI.** Implement only what is needed: no speculative options, extension points, unused parameters or
+  "just in case" code. Every new public type or property is API that FRP and others may depend on.
+- **Clean code.** Intention-revealing names; small, focused methods and classes; early returns instead of deep
+  nesting. No dead or commented-out code, no `System.out`/`printStackTrace` (log through SLF4J), no `TODO` without
+  an issue number. Never return `null` for collections or `Optional`. Prefer immutability (`final`, records,
+  unmodifiable collections).
+- **Scope.** Keep changes focused on the issue. Unrelated refactoring or cleanup goes into its own issue and commit.
+- **Dependencies.** Do not add a new library or Maven plugin without the user's approval; keep the library's
+  dependency footprint small (prefer `optional`/`provided` scope for integrations).
+- **Security.** No secrets in the repository, tests or logs. SQL only with bind parameters; identifiers only through
+  `SchemaNames` (see Conventions).
+
 ## Conventions
 
 - Keep the library generic: no FRP-specific concepts (users, ownership, access rights) – those belong in FRP.
@@ -74,5 +97,12 @@ The library is not on Maven Central yet; FRP (`C:\dev\Projects\office\frp\Family
   properties in `README.md`.
 - Validate schema names through `SchemaNames` before using them in SQL; never concatenate unvalidated identifiers.
 - Use `JdbcTemplate` so SQL joins the Spring transaction; do not call `dataSource.getConnection()` directly.
-- Every new feature or fix comes with tests; behaviour touching PostgreSQL gets an integration test against a real
+- Every new feature or fix comes with tests, written first (TDD); behaviour touching PostgreSQL gets an integration test against a real
   database (Testcontainers). No disabled or placeholder tests; every test has meaningful assertions.
+
+## Definition of done
+
+- Tests written first cover the new behaviour; coverage does not drop.
+- `mvn verify` passes; after `mvn install` the FRP backend still builds and its tests pass (`mvn test -pl code/backend`).
+- `README.md` updated when behaviour, configuration or the public API changed; public API (`core`, `schema`) has Javadoc.
+- Committed as `#<issue> - <description>`, pushed to `main`, the issue closed and its project Status set to Done.
