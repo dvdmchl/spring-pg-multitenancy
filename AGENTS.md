@@ -34,6 +34,18 @@ Extracted from [FRP](https://github.com/dvdmchl/frp), which is its main consumer
 - **Commits.** Message format `#<issue> - <description>`, issues in dvdmchl/spring-pg-multitenancy
   (FRP issue numbers are fine when the change is driven by FRP). Agents may commit and push to `main` themselves
   once tests pass. Commit only your own changes; never revert, stash or discard work you did not make.
+- **Issues.** Every new issue in dvdmchl/spring-pg-multitenancy must also be added to the linked GitHub Project
+  **Spring PG Multitenant** (https://github.com/users/dvdmchl/projects/22) with a Status. The gh token needs the
+  `project` scope (`gh auth refresh -s project`, ask the user to run it).
+  ```bash
+  gh issue create -R dvdmchl/spring-pg-multitenancy --title "..." --body "..." --project "Spring PG Multitenant"
+  ITEM=$(gh project item-add 22 --owner dvdmchl --url <issue-url> --format json -q .id)   # idempotent, returns item id
+  gh project item-edit --project-id PVT_kwHOATHpmc4Blc0s --id $ITEM \
+    --field-id PVTSSF_lAHOATHpmc4Blc0szhkJqy8 --single-select-option-id <status>
+  ```
+  Status option ids: Backlog `f75ad846`, In progress `47fc9ee4`, Done `98236657`. Set In progress when you
+  start the work and Done when you close the issue. Issues for FRP itself go to dvdmchl/frp and its project
+  FRP (https://github.com/users/dvdmchl/projects/10).
 - Close the issue when the work is done and pushed.
 - Never run `mvn -Prelease deploy` (Maven Central release) unless the user explicitly asks.
 
