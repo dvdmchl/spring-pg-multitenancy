@@ -1,1 +1,2 @@
 org.dreamabout.sw.multitenancy.config.MultitenancyAutoConfiguration
+org.dreamabout.sw.multitenancy.config.TenantSchemaAutoConfiguration

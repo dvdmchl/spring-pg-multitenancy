@@ -56,6 +56,44 @@ multitenancy.default-schema=public
 
 For async work, use `MultitenancyTaskDecorator` so the tenant context is propagated to worker threads.
 
+## Tenant schema lifecycle
+
+`TenantSchemaManager` creates, copies and drops tenant schemas:
+
+```java
+tenantSchemaManager.createSchema("tenant_a");          // CREATE + tenant migrations
+tenantSchemaManager.copySchema("tenant_a", "tenant_b"); // structure by migrations, then data
+tenantSchemaManager.dropSchema("tenant_b");
+tenantSchemaManager.findOrphanSchemas();               // schemas no tenant owns
+```
+
+Tenant schema names must start with a lowercase letter and contain only lowercase letters, digits and
+underscores. Ownership and access rights of tenants are up to the application.
+
+**Migrations.** With Flyway on the classpath (`flyway-core` and `flyway-database-postgresql`), every new
+schema is migrated from `multitenancy.migration.locations`. Migrations can use the `${schema}` placeholder.
+Provide your own `TenantSchemaMigrator` bean to use something else.
+
+**Startup.** When the application provides a `TenantRegistry` bean listing the schemas of all tenants,
+all of them are migrated on startup. A failing schema is logged and does not stop the others.
+
+**Copy order.** `TableCopyPriorityProvider` beans decide the order of the copied tables (lower first,
+default 10), so that referenced tables are filled first. Sequences are reset after the copy.
+
+**Events.** `TenantSchemaCreatedEvent`, `TenantSchemaCopiedEvent` and `TenantSchemaDroppedEvent` are published
+as Spring application events, e.g. for audit logging or seeding tenant data.
+
+```properties
+# never reported as orphans or dropped (public and the default schema always are protected)
+multitenancy.excluded-schemas=template
+multitenancy.migration.locations=classpath:db/migration/tenant
+multitenancy.migration.run-on-startup=true
+multitenancy.migration.table=flyway_schema_history
+# destroys all data, for development only
+multitenancy.migration.clean-before-migrate=false
+multitenancy.migration.repair-on-validation-error=true
+```
+
 ## Releasing to Maven Central
 
 The `release` profile attaches sources and javadoc, signs the artifacts with GPG and uploads them
