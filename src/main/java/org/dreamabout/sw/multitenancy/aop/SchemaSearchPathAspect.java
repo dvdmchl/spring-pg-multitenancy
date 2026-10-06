@@ -10,6 +10,7 @@ import org.dreamabout.sw.multitenancy.config.MultitenancyProperties;
 import org.dreamabout.sw.multitenancy.core.MultitenancyThreadContext;
 import org.dreamabout.sw.multitenancy.core.TenantContext;
 import org.dreamabout.sw.multitenancy.core.TenantIdentifier;
+import org.dreamabout.sw.multitenancy.schema.SchemaNames;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
@@ -35,9 +36,10 @@ public class SchemaSearchPathAspect {
                 .map(TenantIdentifier::getTenantId)
                 .orElse(properties.getDefaultSchema());
 
+        var defaultSchema = SchemaNames.quote(properties.getDefaultSchema());
         var expectedPath = tenantSchema.equals(properties.getDefaultSchema())
-                ? properties.getDefaultSchema()
-                : tenantSchema + ", " + properties.getDefaultSchema();
+                ? defaultSchema
+                : SchemaNames.quote(tenantSchema) + ", " + defaultSchema;
 
         if (!expectedPath.equals(MultitenancyThreadContext.getCurrentSearchPath())) {
             log.info("Setting search path to {}", expectedPath);

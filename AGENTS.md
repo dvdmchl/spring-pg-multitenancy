@@ -59,8 +59,20 @@ Extracted from [FRP](https://github.com/dvdmchl/frp), which is its main consumer
 
 ```bash
 mvn test       # unit + integration tests (Testcontainers)
+mvn verify     # + Checkstyle, SpotBugs and the JaCoCo coverage gate (80 % lines)
 mvn install    # install into the local .m2 – required before FRP picks up changes
+mvn verify -Psonar sonar:sonar   # Sonar analysis (needs the sonarqube container and SONAR_TOKEN)
 ```
+
+- **Static analysis.** Checkstyle (`checkstyle.xml`, same rules as FRP, runs in `validate`), SpotBugs (threshold
+  Medium, `process-classes`) and the JaCoCo line coverage gate (80 %, `verify`) fail the build on any violation.
+  Fix the code, do not fight or suppress the tools. CI (`.github/workflows/ci.yml`) runs `mvn verify`.
+- **Sonar.** Run the Sonar analysis before finishing every change: `mvn verify -Psonar sonar:sonar` against the local
+  SonarQube (`http://localhost:9000`, the `sonarqube` container from FRP's `docker-compose.override.yml`, started with
+  `wsl docker compose up -d` there), project `spring-pg-multitenancy`, coverage from JaCoCo
+  (`target/site/jacoco/jacoco.xml`). `SONAR_TOKEN` must be set in the environment; if it is missing, ask the user for
+  a token instead of skipping the scan. The quality gate must pass and new bugs, vulnerabilities, code smells,
+  security hotspots and duplications must be fixed (`/api/issues/search?componentKeys=spring-pg-multitenancy`).
 
 The library is not on Maven Central yet; FRP (`C:\dev\Projects\office\frp\FamilyResourcePlanning-FRP`) uses the
 `0.1.0-SNAPSHOT` from the local `.m2`. After changing the library, run `mvn install` and then build/test FRP
@@ -103,6 +115,7 @@ These apply to all code and tests and complement the conventions below.
 ## Definition of done
 
 - Tests written first cover the new behaviour; coverage does not drop.
-- `mvn verify` passes; after `mvn install` the FRP backend still builds and its tests pass (`mvn test -pl code/backend`).
+- `mvn verify` passes (static analysis and coverage gate); the Sonar scan passes its quality gate with no open
+  issues; after `mvn install` the FRP backend still builds and its tests pass (`mvn test -pl code/backend`).
 - `README.md` updated when behaviour, configuration or the public API changed; public API (`core`, `schema`) has Javadoc.
 - Committed as `#<issue> - <description>`, pushed to `main`, the issue closed and its project Status set to Done.

@@ -10,6 +10,7 @@ import org.springframework.boot.hibernate.autoconfigure.HibernatePropertiesCusto
 import org.springframework.stereotype.Component;
 
 import javax.sql.DataSource;
+import java.io.Serial;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Map;
@@ -17,6 +18,9 @@ import java.util.Map;
 @Component
 @RequiredArgsConstructor
 public class MultiSchemaConnectionProvider implements MultiTenantConnectionProvider<TenantIdentifier>, HibernatePropertiesCustomizer {
+
+    @Serial
+    private static final long serialVersionUID = 1L;
 
     private final transient DataSource dataSource;
     private final transient MultitenancyProperties properties;

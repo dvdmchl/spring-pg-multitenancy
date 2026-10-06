@@ -44,32 +44,20 @@ public class TenantSchemaManager {
      * Resets every sequence owned by a column of the schema to MAX(column) + 1.
      * The schema name is validated by {@link SchemaNames#validate(String)} before it is inserted.
      */
-    private static final String UPDATE_SEQUENCES = """
-            DO $$
-            DECLARE
-                r RECORD;
-            BEGIN
-                FOR r IN
-                    SELECT
-                        s.nspname AS table_schema,
-                        t.relname AS table_name,
-                        a.attname AS column_name,
-                        c.relname AS sequence_name
-                    FROM pg_class c
-                    JOIN pg_namespace s ON s.oid = c.relnamespace
-                    JOIN pg_depend d ON d.objid = c.oid AND d.deptype IN ('a', 'i')
-                    JOIN pg_attribute a ON a.attrelid = d.refobjid AND a.attnum = d.refobjsubid
-                    JOIN pg_class t ON t.oid = d.refobjid
-                    WHERE c.relkind = 'S'
-                      AND s.nspname = '%s'
-                LOOP
-                    EXECUTE format('SELECT setval(%%L, (SELECT COALESCE(MAX(%%I), 0) + 1 FROM %%I.%%I), false)',
-                                   quote_ident(r.table_schema) || '.' || quote_ident(r.sequence_name),
-                                   r.column_name,
-                                   r.table_schema,
-                                   r.table_name);
-                END LOOP;
-            END $$;
+    /** Builds one {@code setval} statement per sequence owned by a column of a table in the given schema. */
+    private static final String SELECT_SEQUENCE_RESETS = """
+            SELECT format('SELECT setval(%L, (SELECT COALESCE(MAX(%I), 0) + 1 FROM %I.%I), false)',
+                          quote_ident(s.nspname) || '.' || quote_ident(c.relname),
+                          a.attname,
+                          s.nspname,
+                          t.relname)
+            FROM pg_class c
+            JOIN pg_namespace s ON s.oid = c.relnamespace
+            JOIN pg_depend d ON d.objid = c.oid AND d.deptype IN ('a', 'i')
+            JOIN pg_attribute a ON a.attrelid = d.refobjid AND a.attnum = d.refobjsubid
+            JOIN pg_class t ON t.oid = d.refobjid
+            WHERE c.relkind = 'S'
+              AND s.nspname = ?
             """;
 
     private final JdbcTemplate jdbcTemplate;
@@ -121,7 +109,7 @@ public class TenantSchemaManager {
         log.info("Copying tenant schema {} to {}", sourceSchemaName, targetSchemaName);
         schemaMigrator.migrate(targetSchemaName);
         copyData(sourceSchemaName, targetSchemaName);
-        jdbcTemplate.execute(UPDATE_SEQUENCES.formatted(targetSchemaName));
+        resetSequences(targetSchemaName);
 
         eventPublisher.publishEvent(new TenantSchemaCopiedEvent(sourceSchemaName, targetSchemaName));
     }
@@ -170,6 +158,11 @@ public class TenantSchemaManager {
         if (schemaExists(schemaName)) {
             throw new IllegalArgumentException("Schema already exists: " + schemaName);
         }
+    }
+
+    private void resetSequences(String schemaName) {
+        jdbcTemplate.queryForList(SELECT_SEQUENCE_RESETS, String.class, schemaName)
+                .forEach(jdbcTemplate::execute);
     }
 
     private void copyData(String source, String target) {

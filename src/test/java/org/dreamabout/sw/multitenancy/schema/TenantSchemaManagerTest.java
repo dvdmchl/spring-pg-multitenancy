@@ -6,7 +6,6 @@ import org.dreamabout.sw.multitenancy.schema.event.TenantSchemaCreatedEvent;
 import org.dreamabout.sw.multitenancy.schema.event.TenantSchemaDroppedEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.springframework.beans.factory.support.StaticListableBeanFactory;
 import org.springframework.context.ApplicationEventPublisher;
@@ -19,7 +18,9 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -93,6 +94,8 @@ class TenantSchemaManagerTest {
         schemaExists("target", false);
         when(jdbcTemplate.queryForList(anyString(), eq(String.class), eq("source"), eq("flyway_schema_history")))
                 .thenReturn(new ArrayList<>(List.of("b_child", "a_other", "z_parent")));
+        when(jdbcTemplate.queryForList(contains("setval"), eq(String.class), eq("target")))
+                .thenReturn(List.of("SELECT setval('target.seq', 1, false)"));
         TableCopyPriorityProvider priorities = table -> table.equals("z_parent") ? 1 : null;
 
         manager(Map.of("migrator", migrator, "priorities", priorities)).copySchema("source", "target");
@@ -102,9 +105,7 @@ class TenantSchemaManagerTest {
         order.verify(jdbcTemplate).execute("INSERT INTO \"target\".\"z_parent\" SELECT * FROM \"source\".\"z_parent\"");
         order.verify(jdbcTemplate).execute("INSERT INTO \"target\".\"a_other\" SELECT * FROM \"source\".\"a_other\"");
         order.verify(jdbcTemplate).execute("INSERT INTO \"target\".\"b_child\" SELECT * FROM \"source\".\"b_child\"");
-        var sequences = ArgumentCaptor.forClass(String.class);
-        order.verify(jdbcTemplate).execute(sequences.capture());
-        assertThat(sequences.getValue()).contains("setval").contains("s.nspname = 'target'");
+        order.verify(jdbcTemplate).execute("SELECT setval('target.seq', 1, false)");
         order.verify(eventPublisher).publishEvent(new TenantSchemaCopiedEvent("source", "target"));
     }
 
@@ -114,9 +115,12 @@ class TenantSchemaManagerTest {
         schemaExists("source", true);
         schemaExists("target", false);
 
-        assertThatThrownBy(() -> manager(Map.of("migrator", migrator)).copySchema("missing", "target"))
+        var withMigrator = manager(Map.of("migrator", migrator));
+        var withoutMigrator = manager(Map.of());
+
+        assertThatThrownBy(() -> withMigrator.copySchema("missing", "target"))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> manager(Map.of()).copySchema("source", "target"))
+        assertThatThrownBy(() -> withoutMigrator.copySchema("source", "target"))
                 .isInstanceOf(IllegalStateException.class);
         verifyNoInteractions(migrator, eventPublisher);
     }
@@ -153,13 +157,15 @@ class TenantSchemaManagerTest {
 
     @Test
     void findOrphanSchemasRequiresRegistry() {
-        assertThatThrownBy(() -> manager(Map.of()).findOrphanSchemas()).isInstanceOf(IllegalStateException.class);
+        var manager = manager(Map.of());
+
+        assertThatThrownBy(manager::findOrphanSchemas).isInstanceOf(IllegalStateException.class);
     }
 
     @Test
-    void migrationRunnerContinuesAfterFailure() throws Exception {
+    void migrationRunnerContinuesAfterFailure() {
         TenantRegistry registry = () -> List.of("tenant_a", "tenant_b");
-        org.mockito.Mockito.doThrow(new IllegalStateException("boom")).when(migrator).migrate("tenant_a");
+        doThrow(new IllegalStateException("boom")).when(migrator).migrate("tenant_a");
 
         new TenantMigrationRunner(registry, migrator).run(null);
 
