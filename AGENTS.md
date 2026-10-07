@@ -34,6 +34,9 @@ Extracted from [FRP](https://github.com/dvdmchl/frp), which is its main consumer
 - **Commits.** Message format `#<issue> - <description>`, issues in dvdmchl/spring-pg-multitenancy
   (FRP issue numbers are fine when the change is driven by FRP). Agents may commit and push to `main` themselves
   once tests pass. Commit only your own changes; never revert, stash or discard work you did not make.
+- **Review before commit.** Before every commit, review your own diff and fix the findings, then rerun the
+  relevant tests. Claude Code runs the `/code-review` skill, Codex `/review`; without such a tool, go through the
+  diff yourself (bugs, missed edge cases, duplication, rules in this file).
 - **Issues.** Every new issue in dvdmchl/spring-pg-multitenancy must also be added to the linked GitHub Project
   **Spring PG Multitenant** (https://github.com/users/dvdmchl/projects/22) with a Status. The gh token needs the
   `project` scope (`gh auth refresh -s project`, ask the user to run it).
